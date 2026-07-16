@@ -37,10 +37,6 @@ jobs:
             rid: linux-arm64
             executable: wingextract
 
-          - os: macos-13
-            rid: osx-x64
-            executable: wingextract
-
           - os: macos-14
             rid: osx-arm64
             executable: wingextract
