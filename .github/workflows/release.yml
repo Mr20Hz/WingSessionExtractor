@@ -2,26 +2,208 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      - "v*"
+
+  # Optional: Workflow auch manuell starten.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_VERSION: "8.0.x"
+  PROJECT_PATH: "src/WingSessionExtractor.Cli/WingSessionExtractor.Cli.csproj"
+  PRODUCT_NAME: "wingextract"
 
 jobs:
-  publish:
-    strategy:
-      matrix:
-        include:
-          - { os: macos-latest, rid: osx-arm64 }
-          - { os: macos-13, rid: osx-x64 }
-          - { os: ubuntu-latest, rid: linux-x64 }
-          - { os: windows-latest, rid: win-x64 }
+  build:
+    name: Build ${{ matrix.rid }}
     runs-on: ${{ matrix.os }}
 
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            executable: wingextract.exe
+
+          - os: ubuntu-latest
+            rid: linux-x64
+            executable: wingextract
+
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            executable: wingextract
+
+          - os: macos-13
+            rid: osx-x64
+            executable: wingextract
+
+          - os: macos-14
+            rid: osx-arm64
+            executable: wingextract
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
-      - run: dotnet publish src/WingSessionExtractor.Cli -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -o artifacts/${{ matrix.rid }}
-      - uses: actions/upload-artifact@v4
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Display .NET information
+        run: dotnet --info
+
+      - name: Restore
+        run: >
+          dotnet restore
+          "${{ env.PROJECT_PATH }}"
+          --runtime "${{ matrix.rid }}"
+
+      - name: Publish
+        run: >
+          dotnet publish
+          "${{ env.PROJECT_PATH }}"
+          --configuration Release
+          --runtime "${{ matrix.rid }}"
+          --self-contained true
+          --no-restore
+          --output "artifacts/${{ matrix.rid }}"
+          -p:PublishSingleFile=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:PublishTrimmed=false
+
+      - name: Verify executable exists
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          executable="artifacts/${{ matrix.rid }}/${{ matrix.executable }}"
+
+          if [[ ! -f "$executable" ]]; then
+            echo "Executable not found: $executable"
+            find artifacts -maxdepth 3 -type f -print
+            exit 1
+          fi
+
+      - name: Upload published binary
+        uses: actions/upload-artifact@v4
         with:
-          name: wingextract-${{ matrix.rid }}
+          name: ${{ env.PRODUCT_NAME }}-${{ matrix.rid }}
           path: artifacts/${{ matrix.rid }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download published binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ env.PRODUCT_NAME }}-*
+          path: downloaded
+
+      - name: Prepare release packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME}"
+          release_dir="$GITHUB_WORKSPACE/release"
+
+          mkdir -p "$release_dir"
+
+          package_unix() {
+            local rid="$1"
+            local source_dir="downloaded/${PRODUCT_NAME}-${rid}"
+            local package_dir="${PRODUCT_NAME}-${version}-${rid}"
+            local staging_dir="$RUNNER_TEMP/$package_dir"
+
+            rm -rf "$staging_dir"
+            mkdir -p "$staging_dir"
+
+            cp "$source_dir/$PRODUCT_NAME" "$staging_dir/"
+            chmod +x "$staging_dir/$PRODUCT_NAME"
+
+            cp README.md LICENSE "$staging_dir/"
+
+            tar \
+              --directory "$RUNNER_TEMP" \
+              --create \
+              --gzip \
+              --file "$release_dir/${package_dir}.tar.gz" \
+              "$package_dir"
+          }
+
+          package_windows() {
+            local rid="win-x64"
+            local source_dir="downloaded/${PRODUCT_NAME}-${rid}"
+            local package_dir="${PRODUCT_NAME}-${version}-${rid}"
+            local staging_dir="$RUNNER_TEMP/$package_dir"
+
+            rm -rf "$staging_dir"
+            mkdir -p "$staging_dir"
+
+            cp "$source_dir/${PRODUCT_NAME}.exe" "$staging_dir/"
+            cp README.md LICENSE "$staging_dir/"
+
+            (
+              cd "$RUNNER_TEMP"
+              zip \
+                --recurse-paths \
+                "$release_dir/${package_dir}.zip" \
+                "$package_dir"
+            )
+          }
+
+          package_windows
+          package_unix "linux-x64"
+          package_unix "linux-arm64"
+          package_unix "osx-x64"
+          package_unix "osx-arm64"
+
+          (
+            cd "$release_dir"
+            sha256sum \
+              *.zip \
+              *.tar.gz \
+              > SHA256SUMS.txt
+          )
+
+          echo "Release packages:"
+          find "$release_dir" -maxdepth 1 -type f -print
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          prerelease_argument=""
+
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            prerelease_argument="--prerelease"
+          fi
+
+          gh release create \
+            "$GITHUB_REF_NAME" \
+            release/*.zip \
+            release/*.tar.gz \
+            release/SHA256SUMS.txt \
+            --verify-tag \
+            --generate-notes \
+            --title "WingSessionExtractor ${GITHUB_REF_NAME}" \
+            $prerelease_argument
