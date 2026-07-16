@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../WingSessionExtractor.Domain/WingSessionExtractor.Domain.csproj" />
+    <ProjectReference Include="../WingSessionExtractor.Application/WingSessionExtractor.Application.csproj" />
+  </ItemGroup>
+</Project>
