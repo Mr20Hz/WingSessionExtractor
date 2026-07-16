@@ -8,15 +8,32 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
-      - run: dotnet restore
-      - run: dotnet build -c Release --no-restore
-      - run: dotnet test -c Release --no-build
+          dotnet-version: '8.0.x'
+
+      - name: Show .NET information
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore WingSessionExtractor.sln
+
+      - name: Build
+        run: dotnet build WingSessionExtractor.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test WingSessionExtractor.sln --configuration Release --no-build
