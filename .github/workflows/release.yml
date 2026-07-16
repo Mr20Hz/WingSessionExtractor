@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  publish:
+    strategy:
+      matrix:
+        include:
+          - { os: macos-latest, rid: osx-arm64 }
+          - { os: macos-13, rid: osx-x64 }
+          - { os: ubuntu-latest, rid: linux-x64 }
+          - { os: windows-latest, rid: win-x64 }
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet publish src/WingSessionExtractor.Cli -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=true -o artifacts/${{ matrix.rid }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wingextract-${{ matrix.rid }}
+          path: artifacts/${{ matrix.rid }}

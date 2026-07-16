@@ -1,0 +1,10 @@
+<Project Sdk="MSTest.Sdk/3.6.4">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/WingSessionExtractor.Domain/WingSessionExtractor.Domain.csproj" />
+    <ProjectReference Include="../../src/WingSessionExtractor.Application/WingSessionExtractor.Application.csproj" />
+    <ProjectReference Include="../../src/WingSessionExtractor.Infrastructure/WingSessionExtractor.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>
