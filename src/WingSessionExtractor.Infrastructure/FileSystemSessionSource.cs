@@ -1,6 +1,9 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using WingSessionExtractor.Application;
 using WingSessionExtractor.Domain;
+
+[assembly: InternalsVisibleTo("WingSessionExtractor.Tests")]
 
 namespace WingSessionExtractor.Infrastructure;
 
