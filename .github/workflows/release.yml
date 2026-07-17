@@ -14,7 +14,9 @@ permissions:
 env:
   DOTNET_VERSION: "8.0.x"
   PROJECT_PATH: "src/WingSessionExtractor.Cli/WingSessionExtractor.Cli.csproj"
+  GUI_PROJECT_PATH: "src/WingSessionExtractor.Gui/WingSessionExtractor.Gui.csproj"
   PRODUCT_NAME: "wingextract"
+  GUI_PRODUCT_NAME: "WingSessionExtractor.Gui"
 
 jobs:
   build:
@@ -28,18 +30,22 @@ jobs:
           - os: windows-latest
             rid: win-x64
             executable: wingextract.exe
+            gui_executable: WingSessionExtractor.Gui.exe
 
           - os: ubuntu-latest
             rid: linux-x64
             executable: wingextract
+            gui_executable: WingSessionExtractor.Gui
 
           - os: ubuntu-24.04-arm
             rid: linux-arm64
             executable: wingextract
+            gui_executable: WingSessionExtractor.Gui
 
           - os: macos-14
             rid: osx-arm64
             executable: wingextract
+            gui_executable: WingSessionExtractor.Gui
 
     steps:
       - name: Checkout
@@ -59,10 +65,32 @@ jobs:
           "${{ env.PROJECT_PATH }}"
           --runtime "${{ matrix.rid }}"
 
+      - name: Restore GUI
+        run: >
+          dotnet restore
+          "${{ env.GUI_PROJECT_PATH }}"
+          --runtime "${{ matrix.rid }}"
+
       - name: Publish
         run: >
           dotnet publish
           "${{ env.PROJECT_PATH }}"
+          --configuration Release
+          --runtime "${{ matrix.rid }}"
+          --self-contained true
+          --no-restore
+          --output "artifacts/${{ matrix.rid }}"
+          -p:PublishSingleFile=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:PublishTrimmed=false
+
+      - name: Publish GUI
+        run: >
+          dotnet publish
+          "${{ env.GUI_PROJECT_PATH }}"
           --configuration Release
           --runtime "${{ matrix.rid }}"
           --self-contained true
@@ -81,9 +109,16 @@ jobs:
           set -euo pipefail
 
           executable="artifacts/${{ matrix.rid }}/${{ matrix.executable }}"
+          gui_executable="artifacts/${{ matrix.rid }}/${{ matrix.gui_executable }}"
 
           if [[ ! -f "$executable" ]]; then
             echo "Executable not found: $executable"
+            find artifacts -maxdepth 3 -type f -print
+            exit 1
+          fi
+
+          if [[ ! -f "$gui_executable" ]]; then
+            echo "GUI executable not found: $gui_executable"
             find artifacts -maxdepth 3 -type f -print
             exit 1
           fi
@@ -130,8 +165,9 @@ jobs:
             rm -rf "$staging_dir"
             mkdir -p "$staging_dir"
 
-            cp "$source_dir/$PRODUCT_NAME" "$staging_dir/"
+            cp "$source_dir"/* "$staging_dir/"
             chmod +x "$staging_dir/$PRODUCT_NAME"
+            chmod +x "$staging_dir/$GUI_PRODUCT_NAME"
 
             cp README.md LICENSE "$staging_dir/"
 
@@ -152,7 +188,7 @@ jobs:
             rm -rf "$staging_dir"
             mkdir -p "$staging_dir"
 
-            cp "$source_dir/${PRODUCT_NAME}.exe" "$staging_dir/"
+            cp "$source_dir"/* "$staging_dir/"
             cp README.md LICENSE "$staging_dir/"
 
             (

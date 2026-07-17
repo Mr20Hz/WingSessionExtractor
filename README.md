@@ -1,6 +1,6 @@
 # WingSessionExtractor
 
-Cross-platform .NET 8 CLI for converting Behringer WING-LIVE interleaved session recordings into continuous mono WAV tracks.
+Cross-platform .NET 8 CLI and Avalonia desktop application for converting Behringer WING-LIVE interleaved session recordings into continuous mono WAV tracks.
 
 ## Rider
 
@@ -26,6 +26,16 @@ dotnet build -c Release
 dotnet test -c Release
 ```
 
+## Desktop application
+
+Start the portable GUI on Windows, Linux, or macOS with:
+
+```bash
+dotnet run --project src/WingSessionExtractor.Gui
+```
+
+Select the WING recording directory and an output directory, then choose **Start Export**. The application remembers both directories. An in-progress export can be stopped with **Cancel**; temporary `.partial` files are removed when cancellation completes.
+
 ## Features
 
 - RIFF and RF64 parsing
@@ -36,7 +46,7 @@ dotnet test -c Release
 - continuous `CH01.wav`, `CH02.wav`, ... output
 - RF64 output above 4 GiB
 - `.partial` files for safe export
-- no runtime NuGet dependencies
+- portable Avalonia GUI for Windows, Linux, and macOS
 
 ## Verified source format
 

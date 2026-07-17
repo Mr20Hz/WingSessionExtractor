@@ -11,7 +11,8 @@ public sealed class FileSystemSessionSource(IWaveFileReader reader) : ISessionSo
 {
     public IReadOnlyList<SessionSegment> Scan(
         string inputDirectory,
-        string fileName)
+        string fileName,
+        CancellationToken cancellationToken = default)
     {
         var root = Path.GetFullPath(inputDirectory);
         if (!Directory.Exists(root))
@@ -19,13 +20,20 @@ public sealed class FileSystemSessionSource(IWaveFileReader reader) : ISessionSo
             throw new DirectoryNotFoundException(root);
         }
 
-        return Directory
-            .EnumerateFiles(root, fileName, SearchOption.AllDirectories)
-            .Select(path =>
-            {
-                var id = Path.GetFileName(Path.GetDirectoryName(path)!)!;
-                return reader.Read(id, path);
-            })
+        var segments = new List<SessionSegment>();
+        foreach (var path in Directory.EnumerateFiles(
+                     root,
+                     fileName,
+                     SearchOption.AllDirectories))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var id = Path.GetFileName(Path.GetDirectoryName(path)!)!;
+            segments.Add(reader.Read(id, path));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return segments
             .OrderBy(item => ParseHex(item.SessionId))
             .ThenBy(item => item.SessionId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
