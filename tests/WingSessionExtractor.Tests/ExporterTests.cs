@@ -145,16 +145,64 @@ public sealed class ExporterTests
     }
 
     [TestMethod]
-    [ExpectedException(typeof(OperationCanceledException))]
     public void Export_HandlesCancellation()
     {
+        var outputDir = Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N"));
         var format = new WaveFormat(1, 1, 48000, 2, 16);
         var segments = new[] { new SessionSegment("1", "p1", format, 0, 100) };
         var exporter = new InterleavedChannelExporter();
         var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        exporter.Export(segments, new ExportRequest("out"), cancellationToken: cts.Token);
+        Assert.ThrowsException<OperationCanceledException>(() =>
+            exporter.Export(
+                segments,
+                new ExportRequest(outputDir),
+                cancellationToken: cts.Token));
+        Assert.IsFalse(Directory.Exists(outputDir));
+    }
+
+    [TestMethod]
+    public void Export_CancellationRemovesPartialFiles()
+    {
+        var inputPath = Path.GetTempFileName();
+        var outputDir = Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N"));
+        File.WriteAllBytes(inputPath, new byte[8]);
+
+        try
+        {
+            var format = new WaveFormat(1, 1, 48000, 2, 16);
+            var segments = new[]
+            {
+                new SessionSegment("1", inputPath, format, 0, 4),
+                new SessionSegment("2", inputPath, format, 4, 4)
+            };
+            using var cancellation = new CancellationTokenSource();
+            var progress = new SynchronousProgress<ExportProgress>(
+                _ => cancellation.Cancel());
+
+            Assert.ThrowsException<OperationCanceledException>(() =>
+                new InterleavedChannelExporter().Export(
+                    segments,
+                    new ExportRequest(outputDir),
+                    progress,
+                    cancellation.Token));
+
+            Assert.IsFalse(File.Exists(Path.Combine(outputDir, "CH01.wav")));
+            Assert.IsFalse(File.Exists(Path.Combine(outputDir, "CH01.wav.partial")));
+        }
+        finally
+        {
+            File.Delete(inputPath);
+            if (Directory.Exists(outputDir))
+            {
+                Directory.Delete(outputDir, recursive: true);
+            }
+        }
     }
 
     [TestMethod]

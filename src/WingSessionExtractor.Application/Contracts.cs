@@ -9,7 +9,10 @@ public interface IWaveFileReader
 
 public interface ISessionSource
 {
-    IReadOnlyList<SessionSegment> Scan(string inputDirectory, string fileName);
+    IReadOnlyList<SessionSegment> Scan(
+        string inputDirectory,
+        string fileName,
+        CancellationToken cancellationToken = default);
 }
 
 public interface IChannelExporter

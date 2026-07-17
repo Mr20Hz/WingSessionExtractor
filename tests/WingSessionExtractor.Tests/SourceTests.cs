@@ -10,8 +10,11 @@ public sealed class SourceTests
 {
     private sealed class MockReader : IWaveFileReader
     {
+        public int Reads { get; private set; }
+
         public SessionSegment Read(string sessionId, string path)
         {
+            Reads++;
             return new SessionSegment(
                 sessionId,
                 path,
@@ -58,6 +61,34 @@ public sealed class SourceTests
     {
         var source = new FileSystemSessionSource(new MockReader());
         source.Scan("/non/existent/path", "test.wav");
+    }
+
+    [TestMethod]
+    public void Scan_HonorsCancellation()
+    {
+        var directory = Path.Combine(
+            Path.GetTempPath(),
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var reader = new MockReader();
+            var source = new FileSystemSessionSource(reader);
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+
+            Assert.ThrowsException<OperationCanceledException>(() =>
+                source.Scan(
+                    directory,
+                    "test.wav",
+                    cancellation.Token));
+            Assert.AreEqual(0, reader.Reads);
+        }
+        finally
+        {
+            Directory.Delete(directory);
+        }
     }
 
     [TestMethod]
