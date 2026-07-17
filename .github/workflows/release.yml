@@ -167,7 +167,6 @@ jobs:
           package_windows
           package_unix "linux-x64"
           package_unix "linux-arm64"
-          package_unix "osx-x64"
           package_unix "osx-arm64"
 
           (
