@@ -9,7 +9,10 @@ public sealed class ServiceTests
 {
     private sealed class MockSessionSource(IEnumerable<SessionSegment> segments) : ISessionSource
     {
-        public IReadOnlyList<SessionSegment> Scan(string inputDirectory, string fileName) =>
+        public IReadOnlyList<SessionSegment> Scan(
+            string inputDirectory,
+            string fileName,
+            CancellationToken cancellationToken = default) =>
             segments.ToList();
     }
 
@@ -86,5 +89,29 @@ public sealed class ServiceTests
         var exporter = new MockExporter();
         var service = new ExportService(new MockSessionSource(Enumerable.Empty<SessionSegment>()), exporter);
         service.Export("in", "file", new ExportRequest("out"));
+    }
+
+    [TestMethod]
+    public void Export_HonorsPreCancellation()
+    {
+        var format = new WaveFormat(1, 1, 44100, 2, 16);
+        var segments = new[]
+        {
+            new SessionSegment("1", "p1", format, 0, 100)
+        };
+        var exporter = new MockExporter();
+        var service = new ExportService(
+            new MockSessionSource(segments),
+            exporter);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.ThrowsException<OperationCanceledException>(() =>
+            service.Export(
+                "in",
+                "file",
+                new ExportRequest("out"),
+                cancellationToken: cancellation.Token));
+        Assert.AreEqual(0, exporter.Calls.Count);
     }
 }

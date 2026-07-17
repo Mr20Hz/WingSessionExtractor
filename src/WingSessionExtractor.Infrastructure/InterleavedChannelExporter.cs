@@ -13,6 +13,8 @@ public sealed class InterleavedChannelExporter : IChannelExporter
         IProgress<ExportProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (segments.Count == 0)
         {
             throw new ArgumentException("No segments supplied.", nameof(segments));
@@ -30,6 +32,7 @@ public sealed class InterleavedChannelExporter : IChannelExporter
 
         foreach (var segment in segments.Skip(1))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             InspectService.EnsureCompatible(
                 format,
                 segment.Format,
@@ -44,6 +47,7 @@ public sealed class InterleavedChannelExporter : IChannelExporter
         {
             for (var channel = 0; channel < format.Channels; channel++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var final = Path.Combine(
                     request.OutputDirectory,
                     $"CH{channel + 1:00}.wav");
@@ -60,8 +64,8 @@ public sealed class InterleavedChannelExporter : IChannelExporter
                     File.Delete(partial);
                 }
 
-                streams.Add(CreateMono(partial, format, totalFrames));
                 partials.Add(partial);
+                streams.Add(CreateMono(partial, format, totalFrames));
             }
 
             var buffer = ArrayPool<byte>.Shared.Rent(1024 * 1024);
@@ -93,6 +97,8 @@ public sealed class InterleavedChannelExporter : IChannelExporter
                 stream.Flush(flushToDisk: true);
                 stream.Dispose();
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             for (var channel = 0; channel < partials.Count; channel++)
             {

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>WingSessionExtractor.Gui</AssemblyName>
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.18" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../WingSessionExtractor.Application/WingSessionExtractor.Application.csproj" />
+    <ProjectReference Include="../WingSessionExtractor.Infrastructure/WingSessionExtractor.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

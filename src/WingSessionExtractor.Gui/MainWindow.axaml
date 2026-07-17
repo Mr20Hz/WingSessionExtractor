@@ -1,0 +1,85 @@
+<Window
+    x:Class="WingSessionExtractor.Gui.MainWindow"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Wing Session Extractor"
+    Width="760"
+    Height="430"
+    MinWidth="600"
+    MinHeight="390"
+    WindowStartupLocation="CenterScreen">
+  <Grid Margin="32" RowDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" RowSpacing="12">
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock FontSize="26" FontWeight="SemiBold" Text="Wing Session Extractor" />
+      <TextBlock
+          Opacity="0.7"
+          Text="Export WING-LIVE sessions as continuous mono WAV tracks." />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+      <StackPanel Grid.Column="0" Spacing="5">
+        <TextBlock Text="Input directory" />
+        <TextBox
+            IsEnabled="{Binding CanEdit}"
+            Text="{Binding InputDirectory}"
+            Watermark="Select the WING recording directory" />
+      </StackPanel>
+      <Button
+          Grid.Column="1"
+          VerticalAlignment="Bottom"
+          Command="{Binding PickInputCommand}"
+          Content="Browse…" />
+    </Grid>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+      <StackPanel Grid.Column="0" Spacing="5">
+        <TextBlock Text="Output directory" />
+        <TextBox
+            IsEnabled="{Binding CanEdit}"
+            Text="{Binding OutputDirectory}"
+            Watermark="Select where channel WAV files will be written" />
+      </StackPanel>
+      <Button
+          Grid.Column="1"
+          VerticalAlignment="Bottom"
+          Command="{Binding PickOutputCommand}"
+          Content="Browse…" />
+    </Grid>
+
+    <ProgressBar
+        Grid.Row="3"
+        Height="12"
+        Minimum="0"
+        Maximum="100"
+        Value="{Binding ProgressValue}" />
+
+    <TextBlock
+        Grid.Row="4"
+        MinHeight="22"
+        Text="{Binding StatusText}"
+        TextWrapping="Wrap" />
+
+    <Border
+        Grid.Row="5"
+        Padding="12"
+        Background="#22D13438"
+        BorderBrush="#D13438"
+        BorderThickness="1"
+        CornerRadius="4"
+        IsVisible="{Binding HasError}">
+      <TextBlock
+          Foreground="#D13438"
+          Text="{Binding ErrorMessage}"
+          TextWrapping="Wrap" />
+    </Border>
+
+    <StackPanel
+        Grid.Row="6"
+        HorizontalAlignment="Right"
+        Orientation="Horizontal"
+        Spacing="8">
+      <Button Command="{Binding CancelCommand}" Content="Cancel" />
+      <Button Classes="accent" Command="{Binding StartCommand}" Content="Start Export" />
+    </StackPanel>
+  </Grid>
+</Window>

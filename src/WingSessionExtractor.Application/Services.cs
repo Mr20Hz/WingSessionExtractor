@@ -4,9 +4,12 @@ namespace WingSessionExtractor.Application;
 
 public sealed class InspectService(ISessionSource source)
 {
-    public InspectionReport Inspect(string input, string fileName = "00000001.WAV")
+    public InspectionReport Inspect(
+        string input,
+        string fileName = "00000001.WAV",
+        CancellationToken cancellationToken = default)
     {
-        var segments = source.Scan(input, fileName);
+        var segments = source.Scan(input, fileName, cancellationToken);
         if (segments.Count == 0)
         {
             throw new InvalidOperationException("No WING session files found.");
@@ -15,6 +18,7 @@ public sealed class InspectService(ISessionSource source)
         var format = segments[0].Format;
         foreach (var segment in segments.Skip(1))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             EnsureCompatible(format, segment.Format, segment.FilePath);
         }
 
@@ -48,12 +52,14 @@ public sealed class ExportService(
         IProgress<ExportProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var segments = source.Scan(input, fileName);
+        cancellationToken.ThrowIfCancellationRequested();
+        var segments = source.Scan(input, fileName, cancellationToken);
         if (segments.Count == 0)
         {
             throw new InvalidOperationException("No WING session files found.");
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         exporter.Export(segments, request, progress, cancellationToken);
     }
 }
