@@ -8,6 +8,7 @@
     <PackageReference Include="Avalonia" Version="11.3.18" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.18" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.18" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../WingSessionExtractor.Application/WingSessionExtractor.Application.csproj" />

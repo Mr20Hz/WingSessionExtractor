@@ -34,7 +34,18 @@ Start the portable GUI on Windows, Linux, or macOS with:
 dotnet run --project src/WingSessionExtractor.Gui
 ```
 
-Select the WING recording directory and an output directory, then choose **Start Export**. The application remembers both directories. An in-progress export can be stopped with **Cancel**; temporary `.partial` files are removed when cancellation completes.
+Select the WING recording directory and an output directory, then choose **Start Workflow**. The application remembers both directories. An in-progress workflow can be stopped with **Cancel**; temporary `.partial` files are removed when cancellation completes.
+
+### GUI-driven workflow
+
+The desktop application is the manually started workflow orchestrator. It runs
+the configured Application-layer steps sequentially, displays current-step and
+overall progress, and keeps the final result visible after completion, failure,
+or cancellation. The first workflow uses the existing extraction service
+in-process to validate the input, create the selected output directory, and
+extract tracks. There is no daemon, watcher, automatic startup, or automatic
+termination. See [GUI workflow orchestrator](docs/workflow-orchestrator.md) for
+the architecture and extension model.
 
 ## Features
 

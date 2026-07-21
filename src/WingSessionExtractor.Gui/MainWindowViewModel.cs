@@ -1,39 +1,45 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text;
 using WingSessionExtractor.Application;
 
 namespace WingSessionExtractor.Gui;
 
 public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
-    private readonly IExportRunner exportRunner;
+    private readonly IWorkflowRunner workflowRunner;
     private readonly IFolderPicker folderPicker;
     private readonly IDirectorySettingsStore settingsStore;
     private CancellationTokenSource? cancellationTokenSource;
     private string inputDirectory;
     private string outputDirectory;
-    private double progressValue;
+    private double overallProgress;
+    private double stepProgress;
+    private string currentStep = "Not started";
     private string statusText = "Select input and output directories to begin.";
+    private string statusLogText = "";
+    private string finalSummary = "";
     private string errorMessage = "";
-    private bool isRunning;
+    private WorkflowExecutionState executionState = WorkflowExecutionState.Idle;
 
     public MainWindowViewModel(
-        IExportRunner exportRunner,
+        IWorkflowRunner workflowRunner,
         IFolderPicker folderPicker,
         IDirectorySettingsStore settingsStore)
     {
-        this.exportRunner = exportRunner;
+        this.workflowRunner = workflowRunner;
         this.folderPicker = folderPicker;
         this.settingsStore = settingsStore;
 
         var settings = settingsStore.Load();
         inputDirectory = settings.InputDirectory;
         outputDirectory = settings.OutputDirectory;
+        WorkflowSteps = workflowRunner.Steps;
 
         StartCommand = new AsyncDelegateCommand(
-            StartExportAsync,
+            StartWorkflowAsync,
             () => CanStart);
-        CancelCommand = new DelegateCommand(CancelExport, () => IsRunning);
+        CancelCommand = new DelegateCommand(CancelWorkflow, () => CanCancel);
         PickInputCommand = new AsyncDelegateCommand(
             PickInputDirectoryAsync,
             () => CanEdit);
@@ -51,6 +57,8 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public AsyncDelegateCommand PickInputCommand { get; }
 
     public AsyncDelegateCommand PickOutputCommand { get; }
+
+    public IReadOnlyList<WorkflowStepDescriptor> WorkflowSteps { get; }
 
     public string InputDirectory
     {
@@ -78,16 +86,46 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public double ProgressValue
+    public double OverallProgress
     {
-        get => progressValue;
-        private set => Set(ref progressValue, value);
+        get => overallProgress;
+        private set => Set(ref overallProgress, value);
+    }
+
+    public double StepProgress
+    {
+        get => stepProgress;
+        private set => Set(ref stepProgress, value);
+    }
+
+    public string CurrentStep
+    {
+        get => currentStep;
+        private set => Set(ref currentStep, value);
     }
 
     public string StatusText
     {
         get => statusText;
         private set => Set(ref statusText, value);
+    }
+
+    public string StatusLogText
+    {
+        get => statusLogText;
+        private set => Set(ref statusLogText, value);
+    }
+
+    public string FinalSummary
+    {
+        get => finalSummary;
+        private set
+        {
+            if (Set(ref finalSummary, value))
+            {
+                OnPropertyChanged(nameof(HasFinalSummary));
+            }
+        }
     }
 
     public string ErrorMessage
@@ -102,18 +140,21 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    public bool IsRunning
+    public WorkflowExecutionState ExecutionState
     {
-        get => isRunning;
+        get => executionState;
         private set
         {
-            if (!Set(ref isRunning, value))
+            if (!Set(ref executionState, value))
             {
                 return;
             }
 
+            OnPropertyChanged(nameof(IsRunning));
+            OnPropertyChanged(nameof(IsCancelling));
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(CanStart));
+            OnPropertyChanged(nameof(CanCancel));
             StartCommand.RaiseCanExecuteChanged();
             CancelCommand.RaiseCanExecuteChanged();
             PickInputCommand.RaiseCanExecuteChanged();
@@ -121,16 +162,28 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool IsRunning =>
+        ExecutionState is WorkflowExecutionState.Running or
+            WorkflowExecutionState.Cancelling;
+
+    public bool IsCancelling =>
+        ExecutionState == WorkflowExecutionState.Cancelling;
+
     public bool CanEdit => !IsRunning;
 
     public bool CanStart =>
-        !IsRunning &&
+        CanEdit &&
         !string.IsNullOrWhiteSpace(InputDirectory) &&
         !string.IsNullOrWhiteSpace(OutputDirectory);
 
+    public bool CanCancel =>
+        ExecutionState == WorkflowExecutionState.Running;
+
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
-    public async Task StartExportAsync()
+    public bool HasFinalSummary => !string.IsNullOrWhiteSpace(FinalSummary);
+
+    public async Task StartWorkflowAsync()
     {
         if (!CanStart)
         {
@@ -138,9 +191,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
 
         ErrorMessage = "";
-        ProgressValue = 0;
-        StatusText = "Scanning sessions…";
-        IsRunning = true;
+        FinalSummary = "";
+        StatusLogText = "";
+        OverallProgress = 0;
+        StepProgress = 0;
+        CurrentStep = "Preparing workflow";
+        StatusText = "Starting workflow…";
+        ExecutionState = WorkflowExecutionState.Running;
         SaveSettings();
 
         using var cancellation = new CancellationTokenSource();
@@ -148,41 +205,39 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
         try
         {
-            var progress = new Progress<ExportProgress>(ReportProgress);
-            await exportRunner.ExportAsync(
-                InputDirectory,
-                OutputDirectory,
+            var context = new WorkflowContext(InputDirectory, OutputDirectory);
+            var progress = new Progress<WorkflowProgress>(ReportProgress);
+            var result = await workflowRunner.RunAsync(
+                context,
                 progress,
                 cancellation.Token);
 
-            ProgressValue = 100;
-            StatusText = "Export completed.";
-        }
-        catch (OperationCanceledException)
-            when (cancellation.IsCancellationRequested)
-        {
-            StatusText = "Export cancelled.";
+            ApplyResult(result);
         }
         catch (Exception exception)
         {
+            ExecutionState = WorkflowExecutionState.Failed;
             ErrorMessage = exception.Message;
-            StatusText = "Export failed.";
+            StatusText = "Workflow failed.";
+            AppendLog($"Unexpected GUI workflow error: {exception}");
+            FinalSummary = $"Failed — {exception.Message}";
         }
         finally
         {
             cancellationTokenSource = null;
-            IsRunning = false;
         }
     }
 
-    public void CancelExport()
+    public void CancelWorkflow()
     {
-        if (cancellationTokenSource is null)
+        if (!CanCancel || cancellationTokenSource is null)
         {
             return;
         }
 
+        ExecutionState = WorkflowExecutionState.Cancelling;
         StatusText = "Cancelling…";
+        AppendLog("Cancellation requested.");
         cancellationTokenSource.Cancel();
     }
 
@@ -225,15 +280,74 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         }
     }
 
-    private void ReportProgress(ExportProgress progress)
+    private void ReportProgress(WorkflowProgress progress)
     {
-        ProgressValue = progress.TotalFrames == 0
-            ? 100
-            : progress.FramesProcessed * 100.0 / progress.TotalFrames;
-        StatusText =
-            $"Exporting session {progress.SessionId} " +
-            $"({progress.SessionIndex}/{progress.SessionCount}) — " +
-            $"{ProgressValue:0.0}%";
+        CurrentStep = progress.CurrentStepDisplayName;
+        OverallProgress = progress.OverallPercentage;
+        StepProgress = progress.StepPercentage;
+        StatusText = string.IsNullOrWhiteSpace(progress.Message)
+            ? $"Running {progress.CurrentStepDisplayName}…"
+            : progress.Message;
+        AppendLog(
+            $"[{progress.CurrentStepIndex}/{progress.StepCount}] " +
+            $"{progress.CurrentStepDisplayName}: {StatusText}");
+    }
+
+    private void ApplyResult(WorkflowResult result)
+    {
+        ExecutionState = result.State;
+        if (result.State == WorkflowExecutionState.Completed)
+        {
+            OverallProgress = 100;
+            StepProgress = 100;
+            StatusText = "Workflow completed.";
+        }
+        else if (result.State == WorkflowExecutionState.Cancelled)
+        {
+            StatusText = "Workflow cancelled.";
+        }
+        else
+        {
+            StatusText = "Workflow failed.";
+            ErrorMessage = result.StepResults.LastOrDefault()?.Message
+                ?? result.Message;
+        }
+
+        AppendLog(result.Message);
+        FinalSummary = BuildSummary(result);
+    }
+
+    private static string BuildSummary(WorkflowResult result)
+    {
+        var summary = new StringBuilder();
+        summary.AppendLine($"Result: {result.State}");
+        summary.AppendLine($"Duration: {result.Duration.TotalSeconds:0.0} seconds");
+        summary.AppendLine(
+            $"Extracted tracks: {result.Context.ExtractedTrackFiles.Count}");
+
+        foreach (var step in result.StepResults)
+        {
+            summary.AppendLine(
+                $"{step.StepDisplayName}: {step.State} " +
+                $"({step.Duration.TotalSeconds:0.0} seconds)" +
+                (string.IsNullOrWhiteSpace(step.Message)
+                    ? ""
+                    : $" — {step.Message}"));
+        }
+
+        return summary.ToString().TrimEnd();
+    }
+
+    private void AppendLog(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        StatusLogText = string.IsNullOrEmpty(StatusLogText)
+            ? message
+            : $"{StatusLogText}{Environment.NewLine}{message}";
     }
 
     private void SaveSettings()
