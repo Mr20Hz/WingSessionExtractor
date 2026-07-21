@@ -50,6 +50,14 @@ public sealed class ExportService(
         string fileName,
         ExportRequest request,
         IProgress<ExportProgress>? progress = null,
+        CancellationToken cancellationToken = default) =>
+        ExportTracks(input, fileName, request, progress, cancellationToken);
+
+    public IReadOnlyList<string> ExportTracks(
+        string input,
+        string fileName,
+        ExportRequest request,
+        IProgress<ExportProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -61,5 +69,11 @@ public sealed class ExportService(
 
         cancellationToken.ThrowIfCancellationRequested();
         exporter.Export(segments, request, progress, cancellationToken);
+
+        return Enumerable.Range(1, segments[0].Format.Channels)
+            .Select(channel => Path.Combine(
+                request.OutputDirectory,
+                $"CH{channel:00}.wav"))
+            .ToArray();
     }
 }
