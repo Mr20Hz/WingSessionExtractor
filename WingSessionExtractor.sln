@@ -19,6 +19,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{00F48013
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WingSessionExtractor.Tests", "tests\WingSessionExtractor.Tests\WingSessionExtractor.Tests.csproj", "{43AF71BA-370A-4926-A01D-081E7B26CDA6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WingSessionExtractor.Infrastructure.Logic", "src\WingSessionExtractor.Infrastructure.Logic\WingSessionExtractor.Infrastructure.Logic.csproj", "{E26C41CD-4EA4-4993-A373-2511BFB5096E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -52,6 +54,10 @@ Global
 		{43AF71BA-370A-4926-A01D-081E7B26CDA6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{43AF71BA-370A-4926-A01D-081E7B26CDA6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{43AF71BA-370A-4926-A01D-081E7B26CDA6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E26C41CD-4EA4-4993-A373-2511BFB5096E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E26C41CD-4EA4-4993-A373-2511BFB5096E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E26C41CD-4EA4-4993-A373-2511BFB5096E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E26C41CD-4EA4-4993-A373-2511BFB5096E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{BC5307A6-DD9C-43AE-8121-D871406E87A4} = {7AD4F7FE-6532-42EB-A16B-C5831625F3BA}
@@ -60,5 +66,6 @@ Global
 		{DD670339-DB82-4973-B2AF-A46E4DC3E1D8} = {7AD4F7FE-6532-42EB-A16B-C5831625F3BA}
 		{5E346824-6E4D-41E6-A992-2208C6850723} = {7AD4F7FE-6532-42EB-A16B-C5831625F3BA}
 		{43AF71BA-370A-4926-A01D-081E7B26CDA6} = {00F48013-A610-4DA0-AF84-D7AE2B9A2756}
+		{E26C41CD-4EA4-4993-A373-2511BFB5096E} = {7AD4F7FE-6532-42EB-A16B-C5831625F3BA}
 	EndGlobalSection
 EndGlobal

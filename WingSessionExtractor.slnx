@@ -3,6 +3,7 @@
     <Project Path="src/WingSessionExtractor.Domain/WingSessionExtractor.Domain.csproj" />
     <Project Path="src/WingSessionExtractor.Application/WingSessionExtractor.Application.csproj" />
     <Project Path="src/WingSessionExtractor.Infrastructure/WingSessionExtractor.Infrastructure.csproj" />
+    <Project Path="src/WingSessionExtractor.Infrastructure.Logic/WingSessionExtractor.Infrastructure.Logic.csproj" />
     <Project Path="src/WingSessionExtractor.Cli/WingSessionExtractor.Cli.csproj" />
     <Project Path="src/WingSessionExtractor.Gui/WingSessionExtractor.Gui.csproj" />
   </Folder>

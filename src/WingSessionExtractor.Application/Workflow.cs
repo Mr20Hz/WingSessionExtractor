@@ -39,6 +39,10 @@ public sealed class WorkflowContext
 
     public IReadOnlyList<string> ExtractedTrackFiles => extractedTrackFiles;
 
+    public DawProjectConfiguration? DawProjectConfiguration { get; private set; }
+
+    public string? DawProjectPath { get; private set; }
+
     public IReadOnlyDictionary<string, string> Metadata => readOnlyMetadata;
 
     public DateTimeOffset? StartTime { get; private set; }
@@ -55,6 +59,18 @@ public sealed class WorkflowContext
     {
         ArgumentNullException.ThrowIfNull(files);
         extractedTrackFiles = Array.AsReadOnly(files.ToArray());
+    }
+
+    public void ConfigureDawProject(DawProjectConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        DawProjectConfiguration = configuration;
+    }
+
+    public void SetDawProjectPath(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+        DawProjectPath = value;
     }
 
     public void SetMetadata(string key, string value)

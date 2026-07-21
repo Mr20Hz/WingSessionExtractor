@@ -4,6 +4,7 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using WingSessionExtractor.Application;
 using WingSessionExtractor.Infrastructure;
+using WingSessionExtractor.Infrastructure.Logic;
 
 namespace WingSessionExtractor.Gui;
 
@@ -24,9 +25,21 @@ public sealed partial class App : Avalonia.Application
                 .AddSingleton<IChannelExporter, InterleavedChannelExporter>()
                 .AddSingleton<ExportService>()
                 .AddSingleton<IWorkflowStep, ExtractTracksWorkflowStep>()
+                .AddSingleton<ILogicRuntimePlatform, LogicRuntimePlatform>()
+                .AddSingleton<ILogicInstallationLocator, LogicInstallationLocator>()
+                .AddSingleton<LogicProjectPlanner>()
+                .AddSingleton<IProcessExecutor, SystemProcessExecutor>()
+                .AddSingleton<PollingWaiter>()
+                .AddSingleton(LogicAutomationTimeouts.Default)
+                .AddSingleton<ILogicAutomationDriver,
+                    AppleScriptLogicAutomationDriver>()
+                .AddSingleton<IDawProjectService, LogicDawProjectService>()
+                .AddSingleton<IWorkflowStep, CreateLogicProjectWorkflowStep>()
                 .AddSingleton<IWorkflowRunner, SequentialWorkflowRunner>()
                 .AddSingleton<IDirectorySettingsStore, JsonDirectorySettingsStore>()
                 .AddSingleton<IFolderPicker>(_ => new AvaloniaFolderPicker(
+                    () => window.StorageProvider))
+                .AddSingleton<IFilePicker>(_ => new AvaloniaFilePicker(
                     () => window.StorageProvider))
                 .AddSingleton<MainWindowViewModel>()
                 .BuildServiceProvider();

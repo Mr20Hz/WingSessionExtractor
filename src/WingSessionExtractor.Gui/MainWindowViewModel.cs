@@ -9,10 +9,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 {
     private readonly IWorkflowRunner workflowRunner;
     private readonly IFolderPicker folderPicker;
+    private readonly IFilePicker filePicker;
     private readonly IDirectorySettingsStore settingsStore;
     private CancellationTokenSource? cancellationTokenSource;
     private string inputDirectory;
     private string outputDirectory;
+    private bool enableLogicProjectCreation;
+    private string logicTemplatePath;
+    private string logicProjectOutputDirectory;
     private double overallProgress;
     private double stepProgress;
     private string currentStep = "Not started";
@@ -25,15 +29,23 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public MainWindowViewModel(
         IWorkflowRunner workflowRunner,
         IFolderPicker folderPicker,
+        IFilePicker filePicker,
+        IDawProjectService dawProjectService,
         IDirectorySettingsStore settingsStore)
     {
         this.workflowRunner = workflowRunner;
         this.folderPicker = folderPicker;
+        this.filePicker = filePicker;
         this.settingsStore = settingsStore;
 
+        LogicCapability = dawProjectService.GetCapability();
         var settings = settingsStore.Load();
         inputDirectory = settings.InputDirectory;
         outputDirectory = settings.OutputDirectory;
+        enableLogicProjectCreation =
+            settings.EnableLogicProjectCreation && LogicCapability.IsAvailable;
+        logicTemplatePath = settings.LogicTemplatePath;
+        logicProjectOutputDirectory = settings.LogicProjectOutputDirectory;
         WorkflowSteps = workflowRunner.Steps;
 
         StartCommand = new AsyncDelegateCommand(
@@ -46,6 +58,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         PickOutputCommand = new AsyncDelegateCommand(
             PickOutputDirectoryAsync,
             () => CanEdit);
+        PickLogicTemplateCommand = new AsyncDelegateCommand(
+            PickLogicTemplateAsync,
+            () => CanEditLogicSettings);
+        PickLogicProjectOutputCommand = new AsyncDelegateCommand(
+            PickLogicProjectOutputDirectoryAsync,
+            () => CanEditLogicSettings);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -58,7 +76,13 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
 
     public AsyncDelegateCommand PickOutputCommand { get; }
 
+    public AsyncDelegateCommand PickLogicTemplateCommand { get; }
+
+    public AsyncDelegateCommand PickLogicProjectOutputCommand { get; }
+
     public IReadOnlyList<WorkflowStepDescriptor> WorkflowSteps { get; }
+
+    public DawProjectCapability LogicCapability { get; }
 
     public string InputDirectory
     {
@@ -79,6 +103,50 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         set
         {
             if (Set(ref outputDirectory, value))
+            {
+                OnPropertyChanged(nameof(CanStart));
+                StartCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool EnableLogicProjectCreation
+    {
+        get => enableLogicProjectCreation;
+        set
+        {
+            if (!Set(ref enableLogicProjectCreation, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(CanStart));
+            OnPropertyChanged(nameof(CanEditLogicSettings));
+            StartCommand.RaiseCanExecuteChanged();
+            PickLogicTemplateCommand.RaiseCanExecuteChanged();
+            PickLogicProjectOutputCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public string LogicTemplatePath
+    {
+        get => logicTemplatePath;
+        set
+        {
+            if (Set(ref logicTemplatePath, value))
+            {
+                OnPropertyChanged(nameof(CanStart));
+                StartCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public string LogicProjectOutputDirectory
+    {
+        get => logicProjectOutputDirectory;
+        set
+        {
+            if (Set(ref logicProjectOutputDirectory, value))
             {
                 OnPropertyChanged(nameof(CanStart));
                 StartCommand.RaiseCanExecuteChanged();
@@ -155,10 +223,14 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CanEdit));
             OnPropertyChanged(nameof(CanStart));
             OnPropertyChanged(nameof(CanCancel));
+            OnPropertyChanged(nameof(CanToggleLogicProjectCreation));
+            OnPropertyChanged(nameof(CanEditLogicSettings));
             StartCommand.RaiseCanExecuteChanged();
             CancelCommand.RaiseCanExecuteChanged();
             PickInputCommand.RaiseCanExecuteChanged();
             PickOutputCommand.RaiseCanExecuteChanged();
+            PickLogicTemplateCommand.RaiseCanExecuteChanged();
+            PickLogicProjectOutputCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -174,7 +246,11 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool CanStart =>
         CanEdit &&
         !string.IsNullOrWhiteSpace(InputDirectory) &&
-        !string.IsNullOrWhiteSpace(OutputDirectory);
+        !string.IsNullOrWhiteSpace(OutputDirectory) &&
+        (!EnableLogicProjectCreation ||
+         (LogicCapability.IsAvailable &&
+          !string.IsNullOrWhiteSpace(LogicTemplatePath) &&
+          !string.IsNullOrWhiteSpace(LogicProjectOutputDirectory)));
 
     public bool CanCancel =>
         ExecutionState == WorkflowExecutionState.Running;
@@ -182,6 +258,12 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool HasFinalSummary => !string.IsNullOrWhiteSpace(FinalSummary);
+
+    public bool CanToggleLogicProjectCreation =>
+        CanEdit && LogicCapability.IsAvailable;
+
+    public bool CanEditLogicSettings =>
+        CanToggleLogicProjectCreation && EnableLogicProjectCreation;
 
     public async Task StartWorkflowAsync()
     {
@@ -206,6 +288,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         try
         {
             var context = new WorkflowContext(InputDirectory, OutputDirectory);
+            context.ConfigureDawProject(new DawProjectConfiguration(
+                EnableLogicProjectCreation,
+                LogicTemplatePath,
+                LogicProjectOutputDirectory));
             var progress = new Progress<WorkflowProgress>(ReportProgress);
             var result = await workflowRunner.RunAsync(
                 context,
@@ -255,6 +341,37 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
             "Select output directory",
             OutputDirectory,
             value => OutputDirectory = value);
+    }
+
+    private async Task PickLogicTemplateAsync()
+    {
+        try
+        {
+            ErrorMessage = "";
+            var selected = await filePicker.PickAsync(
+                "Select Logic Pro template project",
+                LogicTemplatePath,
+                new[] { "*.logicx" });
+            if (selected is null)
+            {
+                return;
+            }
+
+            LogicTemplatePath = selected;
+            SaveSettings();
+        }
+        catch (Exception exception)
+        {
+            ErrorMessage = exception.Message;
+        }
+    }
+
+    private async Task PickLogicProjectOutputDirectoryAsync()
+    {
+        await PickDirectoryAsync(
+            "Select Logic project output directory",
+            LogicProjectOutputDirectory,
+            value => LogicProjectOutputDirectory = value);
     }
 
     private async Task PickDirectoryAsync(
@@ -324,6 +441,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         summary.AppendLine($"Duration: {result.Duration.TotalSeconds:0.0} seconds");
         summary.AppendLine(
             $"Extracted tracks: {result.Context.ExtractedTrackFiles.Count}");
+        if (!string.IsNullOrWhiteSpace(result.Context.DawProjectPath))
+        {
+            summary.AppendLine($"DAW project: {result.Context.DawProjectPath}");
+        }
 
         foreach (var step in result.StepResults)
         {
@@ -356,7 +477,10 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged
         {
             settingsStore.Save(new DirectorySettings(
                 InputDirectory,
-                OutputDirectory));
+                OutputDirectory,
+                EnableLogicProjectCreation,
+                LogicTemplatePath,
+                LogicProjectOutputDirectory));
         }
         catch (IOException exception)
         {

@@ -18,7 +18,12 @@ public sealed class GuiTests
         try
         {
             var store = new JsonDirectorySettingsStore(path);
-            var expected = new DirectorySettings("input", "output");
+            var expected = new DirectorySettings(
+                "input",
+                "output",
+                EnableLogicProjectCreation: true,
+                LogicTemplatePath: "template.logicx",
+                LogicProjectOutputDirectory: "logic-projects");
 
             store.Save(expected);
 
@@ -126,12 +131,38 @@ public sealed class GuiTests
         Assert.IsTrue(viewModel.CanStart);
     }
 
+    [TestMethod]
+    public void ViewModel_DisablesLogicSettingsWhenCapabilityIsUnavailable()
+    {
+        var settings = new MemorySettingsStore(new DirectorySettings(
+            "input",
+            "output",
+            EnableLogicProjectCreation: true,
+            LogicTemplatePath: "template.logicx",
+            LogicProjectOutputDirectory: "projects"));
+        var viewModel = CreateViewModel(
+            new RecordingWorkflowRunner(),
+            settings,
+            new UnavailableDawProjectService());
+
+        Assert.IsFalse(viewModel.EnableLogicProjectCreation);
+        Assert.IsFalse(viewModel.CanToggleLogicProjectCreation);
+        Assert.IsFalse(viewModel.CanEditLogicSettings);
+        Assert.IsTrue(viewModel.CanStart);
+        StringAssert.Contains(
+            viewModel.LogicCapability.Explanation,
+            "only on macOS");
+    }
+
     private static MainWindowViewModel CreateViewModel(
         IWorkflowRunner runner,
-        MemorySettingsStore? settings = null) =>
+        MemorySettingsStore? settings = null,
+        IDawProjectService? dawProjectService = null) =>
         new(
             runner,
             new NullFolderPicker(),
+            new NullFilePicker(),
+            dawProjectService ?? new AvailableDawProjectService(),
             settings ?? new MemorySettingsStore(
                 new DirectorySettings("input", "output")));
 
@@ -214,6 +245,39 @@ public sealed class GuiTests
             string title,
             string currentDirectory) =>
             Task.FromResult<string?>(null);
+    }
+
+    private sealed class NullFilePicker : IFilePicker
+    {
+        public Task<string?> PickAsync(
+            string title,
+            string currentPath,
+            IReadOnlyList<string> patterns) =>
+            Task.FromResult<string?>(null);
+    }
+
+    private sealed class AvailableDawProjectService : IDawProjectService
+    {
+        public DawProjectCapability GetCapability() =>
+            new(true, "Available for tests.");
+
+        public Task<DawProjectResult> CreateProjectAsync(
+            DawProjectRequest request,
+            IProgress<DawProjectProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class UnavailableDawProjectService : IDawProjectService
+    {
+        public DawProjectCapability GetCapability() =>
+            new(false, "Logic project creation is available only on macOS.");
+
+        public Task<DawProjectResult> CreateProjectAsync(
+            DawProjectRequest request,
+            IProgress<DawProjectProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class MemorySettingsStore(DirectorySettings settings)

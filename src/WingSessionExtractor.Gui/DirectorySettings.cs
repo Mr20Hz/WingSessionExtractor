@@ -4,7 +4,10 @@ namespace WingSessionExtractor.Gui;
 
 public sealed record DirectorySettings(
     string InputDirectory = "",
-    string OutputDirectory = "");
+    string OutputDirectory = "",
+    bool EnableLogicProjectCreation = false,
+    string LogicTemplatePath = "",
+    string LogicProjectOutputDirectory = "");
 
 public interface IDirectorySettingsStore
 {

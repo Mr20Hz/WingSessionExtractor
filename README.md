@@ -9,13 +9,13 @@ Open `WingSessionExtractor.slnx`.
 Run configuration for inspection:
 
 ```text
-inspect --input "/Users/timbautz/Music/tow/probe210626/rawsd1"
+inspect --input "/path/to/WING/rawsd1"
 ```
 
 Run configuration for export:
 
 ```text
-export --input "/Users/timbautz/Music/tow/probe210626/rawsd1" --output "/Users/timbautz/Music/WING_JOINED" --channels 16 --overwrite
+export --input "/path/to/WING/rawsd1" --output "/path/to/output" --channels 16 --overwrite
 ```
 
 ## Build
@@ -46,6 +46,15 @@ in-process to validate the input, create the selected output directory, and
 extract tracks. There is no daemon, watcher, automatic startup, or automatic
 termination. See [GUI workflow orchestrator](docs/workflow-orchestrator.md) for
 the architecture and extension model.
+
+### Logic Pro integration
+
+On macOS, the GUI can optionally copy a user-selected Logic project template,
+open the copy in Logic Pro, import extracted mono tracks in numeric channel
+order, and save the new project. Logic settings remain unavailable on Windows
+and Linux. Accessibility permission is required for the isolated UI automation
+used by Logic's import dialog. See [Logic Pro integration](docs/logic-integration.md)
+for template requirements, permissions, timeouts, and troubleshooting.
 
 ## Features
 

@@ -6,6 +6,7 @@
     <ProjectReference Include="../../src/WingSessionExtractor.Domain/WingSessionExtractor.Domain.csproj" />
     <ProjectReference Include="../../src/WingSessionExtractor.Application/WingSessionExtractor.Application.csproj" />
     <ProjectReference Include="../../src/WingSessionExtractor.Infrastructure/WingSessionExtractor.Infrastructure.csproj" />
+    <ProjectReference Include="../../src/WingSessionExtractor.Infrastructure.Logic/WingSessionExtractor.Infrastructure.Logic.csproj" />
     <ProjectReference Include="../../src/WingSessionExtractor.Gui/WingSessionExtractor.Gui.csproj" />
   </ItemGroup>
 </Project>
